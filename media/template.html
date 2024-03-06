@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="created" content='$created$'>
+    <title>$title$</title>
+    <style>
+      /* General body styling */
+      body {
+        background-color: white;
+        font-family: 'Source Sans Pro', sans-serif;
+        font-size: 16px;
+      }
+
+      /* Specific styling for code elements */
+      code {
+        font-family: 'Source Code Pro', monospace;
+        background-color: #f0f0f0; /* light gray background */
+        display: block; /* to make code blocks span multiple lines */
+        padding: 0.5em; /* Add some padding around the code */
+        white-space: pre-wrap; /* Ensures that code respects original whitespace and line breaks */
+        font-size: 13px; /* Sets the text size for code blocks */
+      }
+
+      /* H1 styling */
+      h1 {
+        font-size: 1.125em;
+        color: #393E99;
+      }
+
+      /* H2 styling */
+      h2 {
+        font-size: 1em;
+        color: #000000;
+      }
+
+      /* H3 styling */
+      h3 {
+        font-size: 1em;
+        color: #000000;
+      }
+
+      .highlight {
+        background-color: yellow;
+      }
+
+      .content-container {
+        max-width: 800px; /* Adjust this value to suit your design */
+        margin: 0 auto; /* Centers the container */
+        padding: 20px; /* Adds some space inside the container */
+      }
+
+      .content-container img {
+        max-width: 100%; /* Ensures images are never wider than their container */
+        height: auto; /* Maintains the aspect ratio of the image */
+      }
+
+      @media (max-width: 800px) {
+        .content-container {
+          padding: 10px; /* Reduces padding on smaller screens */
+        }
+      }      
+    </style>
+
+  </head>
+  <body>
+    <div class="content-container">
+$body$
+    </div>
+  </body>
+</html>
