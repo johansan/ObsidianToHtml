@@ -8,7 +8,7 @@ from datetime import datetime
 
 
 # Source and destination folders
-source_directory = '/Users/johan/Documents/Notes'
+source_directory = '/Users/johan/Documents/Notes-test'
 output_directory = '/Users/johan/Documents/Notes-html'
 
 # The following folders will be excluded from processing
@@ -25,26 +25,42 @@ def get_file_modification_date(file_path):
 
 
 # Clean up Obsidian media links:
-# "../../_resources/image.png|450" -> "_resources/image.png"
+# ![[../../_resources/image.png|450]] -> ![](_resources/image.png)
 def cleanup_image_link(match):
+    inner_text = match.group(1)
     # Remove all occurrences of "../" within the matched text
-    cleaned_text = re.sub(r'\.\./', '', match.group(0))
+    cleaned_text = re.sub(r'\.\./', '', inner_text)
     # Remove "|number" at the end of the string
-    cleaned_text = re.sub(r'\|\d+]]$', ']]', cleaned_text)
-    return cleaned_text
+    cleaned_text = re.sub(r'\|\d+$', '', cleaned_text)
+    return '![](' + cleaned_text + ')'
+
+
+# Clean up Obsidian WIKI links:
+# [[../Folder/My document|My document]] -> [My document](../Folder/My document)
+# [[My second document]] -> [My second document](My second document)
+def cleanup_wiki_link(match):
+    inner_text = match.group(1)
+    title = ''
+    # Check to see if the wiki link has a title, like "|Title" at the end of the string
+    title_match = re.search(r'\|(.+?)$', inner_text)
+    # Remove "|Title" at the end of the string.
+    cleaned_text = re.sub(r'\|.+?$', '', inner_text)
+    if title_match:
+        title = title_match.group(1)
+    else:
+        title = cleaned_text
+    return '[' + title + '](' + cleaned_text + '.html)'
 
 
 def modify_content_with_regex(content):
-    # Find all text within double brackets
-    pattern = r'\[\[(.*?)\]\]'
-
     # Clean up Obsidian media links:
-    content = re.sub(pattern, cleanup_image_link, content)
-
-    # Convert WIKI links to standard Markdown links:
-    # [[link]] -> [](link.html)
     pattern = r'!\[\[(.*?)\]\]'
-    modified_content = re.sub(pattern, r'![](\1)', content)
+    modified_content = re.sub(pattern, cleanup_image_link, content)
+
+    # Clean up document WIKI links:
+    # [[../Folder/Document]] -> [../Folder/Document](../Folder/Document.html)
+    pattern = r'\[\[(.*?)\]\]'
+    modified_content = re.sub(pattern, cleanup_wiki_link, modified_content)
 
     # Change Markdown style highlights into HTML span elements
     pattern = r'==(.*?)=='
