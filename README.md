@@ -8,6 +8,7 @@ This Python script **for MacOS** converts your entire Obsidian vault with markdo
 5. Images are embedded in-place
 6. Yellow highlights are converted from markdown-style format into HTML-style div tags
 7. Code comments are colored correctly
+8. Document links are fully supported
 
 ## IMPORTANT
 
