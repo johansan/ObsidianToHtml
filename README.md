@@ -1,5 +1,5 @@
 # ObsidianToHtml
-This Python script converts your entire Obsidian vault with markdown documents into HTML documents in a new folder with identical structure. The script uses Pandoc and will convert the following parameters:
+This Python script **for MacOS** converts your entire Obsidian vault with markdown documents into HTML documents in a new folder with identical structure. The script uses Pandoc and will convert the following parameters:
 
 1. File name
 2. File creation date
@@ -16,6 +16,8 @@ This script makes the following assumptions:
 2. You need to change "source_directory" and "output_directory" in the script. "source_directory" should point at your Obsidian vault folder, "output_directory" should be another, empty folder.
 3. You can exclude folders you do not want to process using "excluded_dirs". This is already set to {'_excalidraw', '_resources', '_templates', '.obsidian', '.trash'}.
 4. You can modify the HTML template according to your likings, the file is called "template.html".
+
+**The script also requires MacOS for setting file creation time.** You need to update the code if you want to run it under Windows.
 
 ## EXAMPLES
 
