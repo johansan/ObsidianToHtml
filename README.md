@@ -23,4 +23,4 @@ Here is a simple example showing how elements are converted from Markdown to HTM
 
 ![](media/Example-obsidian.png)
 
-![](media/Example-Example-resulting_html.png)
+![](media/Example-resulting_html.png)
