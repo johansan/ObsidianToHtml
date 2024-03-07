@@ -19,6 +19,17 @@ This Python script **for Windows and MacOS** converts your entire Obsidian vault
 
 To run the script you need Python and Pandoc installed. For Python environment [I recommend PyCharm CE](https://www.jetbrains.com/pycharm/download/other.html), Pandoc [can be downloaded here](https://pandoc.org/installing.html).
 
+## Frontmatter Properties
+
+You can add keys to the file **template.html** for the Frontmatter properties you want to be copied over. For example:
+
+```
+<meta name="author" content='$author$'>
+<meta name="description" content='$description$'>
+<meta name="keywords" content='$keywords$'>
+```
+
+
 ## EXAMPLES
 
 Here is a simple example showing how elements are converted from Markdown to HTML:
