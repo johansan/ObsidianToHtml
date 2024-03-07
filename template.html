@@ -8,19 +8,34 @@
       /* General body styling */
       body {
         background-color: white;
-        font-family: 'Source Sans Pro', sans-serif;
-        font-size: 16px;
+        /* MacOS font style */
+        font-family: 'Helvetica Neue', sans-serif;
+        font-size: 15px;
       }
+      @supports (font-family: Calibri) {
+        body {
+          /* Windows font style */
+          font-family: 'Calibri', sans-serif;
+          font-size: 18px;
+        }
 
       /* Specific styling for code elements */
       code {
-        font-family: 'Source Code Pro', monospace;
         background-color: #f0f0f0; /* light gray background */
         display: block; /* to make code blocks span multiple lines */
         padding: 0.5em; /* Add some padding around the code */
         white-space: pre-wrap; /* Ensures that code respects original whitespace and line breaks */
+        /* MacOS font style */
+        font-family: 'Menlo', monospace;
         font-size: 13px; /* Sets the text size for code blocks */
       }
+      @supports (font-family: Consolas) {
+        code {
+          /* Windows font style */
+          font-family: 'Consolas', sans-serif;
+          font-size: 16px;
+        }
+
 
       /* H1 styling */
       h1 {

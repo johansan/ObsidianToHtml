@@ -1,12 +1,14 @@
 from tqdm import tqdm
 import json
 import os
+import platform
 import subprocess
 import tempfile
 import re
 import sys
 from pathlib import Path
 from datetime import datetime
+from urllib.parse import quote
 
 from util import folder_utils as fu
 
@@ -21,17 +23,21 @@ template = 'template.html'
 
 
 # Clean up Obsidian media links:
-# ![[../../_resources/image.png|450]] -> ![](_resources/image.png)
+# ![[../../_resources/my image.png|450]] -> ![](../../_resources/my%20image.png)
 def cleanup_image_link(match):
     inner_text = match.group(1)
     # Remove "|width" at the end of the string
     cleaned_text = re.sub(r'\|\d+$', '', inner_text)
-    return '![](' + cleaned_text + ')'
+    # Format the URL in standard markdown format
+    url = '![](' + cleaned_text + ')'
+    # Encode the URL to handle special characters
+    encoded_url = quote(url)
+    return encoded_url
 
 
 # Clean up Obsidian WIKI links:
-# [[../Folder/My document|My document]] -> [My document](../Folder/My document)
-# [[My second document]] -> [My second document](My second document)
+# [[../Folder/My document|My document]] -> [My document](../Folder/My%20document)
+# [[My second document]] -> [My%20second%20document](My%20second%20document)
 def cleanup_wiki_link(match):
     inner_text = match.group(1)
     title = ''
@@ -43,7 +49,9 @@ def cleanup_wiki_link(match):
         title = title_match.group(1)
     else:
         title = cleaned_text
-    return '[' + title + '](' + cleaned_text + '.html)'
+    url = '[' + title + '](' + cleaned_text + '.html)'
+    encoded_url = quote(url)
+    return encoded_url
 
 
 def modify_content_with_regex(content):
@@ -59,7 +67,6 @@ def modify_content_with_regex(content):
             parts_content = re.sub(pattern, cleanup_image_link, parts[i])
 
             # Clean up document WIKI links:
-            # [[../Folder/Document]] -> [../Folder/Document](../Folder/Document.html)
             pattern = r'\[\[(.*?)\]\]'
             parts_content = re.sub(pattern, cleanup_wiki_link, parts_content)
 
@@ -67,6 +74,8 @@ def modify_content_with_regex(content):
             pattern = r'==(.*?)=='
             replacement = r'<span class="highlight">\1</span>'
             parts_content = re.sub(pattern, replacement, parts_content)
+
+            # TODO: Add more regex patterns to modify the content as you like
 
             parts[i] = parts_content
 
@@ -90,7 +99,7 @@ def modify_and_convert_file(file_path, source_base, output_base, template_file):
         modified_content = modify_content_with_regex(content)
 
         # Create a temporary file to save modified content
-        with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.md') as temp_file:
+        with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.md', encoding='utf-8') as temp_file:
             temp_file.write(modified_content)
             temp_file_path = temp_file.name
 
@@ -119,11 +128,29 @@ def modify_and_convert_file(file_path, source_base, output_base, template_file):
         stat = os.stat(file.name)
         creation_time = stat.st_birthtime
         formatted_time = datetime.fromtimestamp(creation_time).strftime('%m/%d/%Y %H:%M:%S')
-        command = ['SetFile', '-d', formatted_time, output_html_path]
-        try:
-            subprocess.run(command, check=True)
-        except subprocess.CalledProcessError as e:
-            print(f"Error changing creation date: {e}")
+
+        # Change the creation date of the output file to match the source file
+        if platform.system() == 'Darwin':  # macOS
+            command = ['SetFile', '-d', formatted_time, file_path]
+            try:
+                subprocess.run(command, check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"Error changing creation date: {e}")
+        elif platform.system() == 'Windows':
+            try:
+                import win32_setfiletime
+                # Convert formatted_time back to a timestamp
+                creation_timestamp = datetime.strptime(formatted_time, '%m/%d/%Y %H:%M:%S').timestamp()
+                # Set creation, modified, and access times to the same value
+                win32_setfiletime.setctime(file_path, creation_timestamp)
+                win32_setfiletime.setmtime(file_path, creation_timestamp)
+                win32_setfiletime.setatime(file_path, creation_timestamp)
+            except ImportError:
+                print("You need to install pywin32. Run 'pip install pywin32' and then 'pip install win32-setfiletime'")
+            except Exception as e:
+                print(f"Error changing creation date: {e}")
+        else:
+            print("Unsupported OS")
 
         # Remove the temporary file
         os.remove(temp_file_path)
