@@ -24,10 +24,8 @@ template = 'template.html'
 # ![[../../_resources/image.png|450]] -> ![](_resources/image.png)
 def cleanup_image_link(match):
     inner_text = match.group(1)
-    # Remove all occurrences of "../" within the matched text
-    cleaned_text = re.sub(r'\.\./', '', inner_text)
-    # Remove "|number" at the end of the string
-    cleaned_text = re.sub(r'\|\d+$', '', cleaned_text)
+    # Remove "|width" at the end of the string
+    cleaned_text = re.sub(r'\|\d+$', '', inner_text)
     return '![](' + cleaned_text + ')'
 
 
@@ -49,7 +47,6 @@ def cleanup_wiki_link(match):
 
 
 def modify_content_with_regex(content):
-
     # Don't touch content within code blocks
     pattern = r'(```.*?```)'  # Match everything between ``` and ```
     parts = re.split(pattern, content, flags=re.DOTALL)
@@ -80,12 +77,14 @@ def modify_content_with_regex(content):
 
 
 def modify_and_convert_file(file_path, source_base, output_base, template_file):
-
     with open(file_path, 'r', encoding='utf-8') as file:
         content = file.read()
 
         # Get filename
-        filename = Path(file.name).stem
+        filename = Path(file_path).stem
+
+        # Get folderpath
+        foldername = os.path.dirname(file_path)
 
         # Modify the file content using regular expressions
         modified_content = modify_content_with_regex(content)
@@ -103,7 +102,7 @@ def modify_and_convert_file(file_path, source_base, output_base, template_file):
 
         command = [
             'pandoc', '--standalone', '--embed-resources', '-f', 'markdown+hard_line_breaks',
-            '-t', 'html', '--resource-path', source_base,
+            '-t', 'html', '--resource-path', foldername,
             '--template', template_file,
             '--metadata', 'title=' + filename,
             '--fail-if-warnings',
