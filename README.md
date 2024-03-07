@@ -14,10 +14,8 @@ This Python script **for MacOS** converts your entire Obsidian vault with markdo
 
 ## IMPORTANT
 
-This script makes the following assumptions:
-1. All your resources (such as images) are all located in one single folder, for example "_resources" at the top of your vault. 
-2. You can exclude folders you do not want to process using "excluded_dirs". This is already set to {'_excalidraw', '_resources', '_templates', '.obsidian', '.trash'}.
-3. You can modify the HTML template according to your likings, the file is called "template.html".
+1. You can exclude folders you do not want to process using the variable "excluded_dirs". This is already set to {'_excalidraw', '_resources', '_templates', '.obsidian', '.trash'}.
+2. You can modify the HTML template according to your likings, the file is called "template.html".
 
 **The script also requires MacOS for setting file creation time.** You need to update the code if you want to run it under Windows.
 
