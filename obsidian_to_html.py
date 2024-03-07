@@ -1,15 +1,17 @@
 from tqdm import tqdm
+import json
 import os
 import subprocess
 import tempfile
 import re
+import sys
 from pathlib import Path
 from datetime import datetime
 
+from util import folder_utils as fu
 
-# Source and destination folders
-source_directory = '/Users/johan/Documents/Notes-test'
-output_directory = '/Users/johan/Documents/Notes-html'
+# Configuration file for obsidian vault and destination folder
+config_file_name = 'config.json'
 
 # The following folders will be excluded from processing
 excluded_dirs = {'_excalidraw', '_resources', '_templates', '.obsidian', '.trash'}
@@ -149,11 +151,49 @@ def process_directory(source_base, output_base, template_file):
         modify_and_convert_file(file_path, source_base, output_base, template_file)
 
 
+def save_paths(obsidian_folder, destination_folder):
+    """Save the folder paths to the config file in JSON format."""
+    config_data = {'obsidian_folder': obsidian_folder, 'destination_folder': destination_folder}
+    with open(config_file_name, 'w') as file:
+        json.dump(config_data, file)
+
+
+def load_paths():
+    """Load the folder paths from the config file."""
+    with open(config_file_name, 'r') as file:
+        config_data = json.load(file)
+    return config_data['obsidian_folder'], config_data['destination_folder']
+
+
 if __name__ == "__main__":
     current_file = os.path.realpath(__file__)
     current_folder = os.path.dirname(current_file)
     template_file = current_folder + '/' + template
 
+    # Check if the config file exists
+    if os.path.exists(config_file_name):
+        obsidian_folder, destination_folder = load_paths()
+        print("Loaded paths from config file.\nObsidian vault: ", obsidian_folder, "\nDestination folder: ", destination_folder)
+    else:
+        obsidian_folder = fu.remove_trailing_slash(input("Enter source path to your Obsidian vault: "))
+
+        # Check for .obsidian folder in Obsidian_folder
+        if not fu.folder_exists(obsidian_folder, ".obsidian"):
+            print("Error: No '.obsidian' folder found in the specified Obsidian vault, please check your path.")
+            sys.exit(1)
+
+        destination_folder = fu.remove_trailing_slash(input("Enter destination folder for generated HTML: "))
+
+        # Check if Destination_folder is empty
+        if not fu.folder_empty(destination_folder):
+            proceed = input("Warning: The destination folder is not empty. Do you want to continue? (y/n): ")
+            if proceed.lower() != 'y':
+                print("Operation cancelled by the user.")
+                sys.exit(1)
+
+        save_paths(obsidian_folder, destination_folder)
+        print("Paths have been saved to '" + config_file_name + "'")
+
     # Call the process_directory function with command line arguments
-    process_directory(source_directory, output_directory, template_file)
+    process_directory(obsidian_folder, destination_folder, template_file)
 
