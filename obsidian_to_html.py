@@ -20,12 +20,6 @@ excluded_dirs = {'_excalidraw', '_resources', '_templates', '.obsidian', '.trash
 template = 'template.html'
 
 
-def get_file_modification_date(file_path):
-    """Get the file modification date."""
-    stat = os.stat(file_path)
-    return datetime.fromtimestamp(stat.st_mtime)
-
-
 # Clean up Obsidian media links:
 # ![[../../_resources/image.png|450]] -> ![](_resources/image.png)
 def cleanup_image_link(match):
