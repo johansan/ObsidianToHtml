@@ -28,10 +28,11 @@ def cleanup_image_link(match):
     inner_text = match.group(1)
     # Remove "|width" at the end of the string
     cleaned_text = re.sub(r'\|\d+$', '', inner_text)
-    # Encode the URL to handle special characters
-    encoded_url = quote(cleaned_text)
     # Format the URL in standard markdown format
-    url = '![](' + encoded_url + ')'
+    url = '![](' + cleaned_text + ')'
+    if platform.system() == 'Windows':
+        # Encode the URL to handle special characters on Windows systems
+        url = quote(url)
     return url
 
 
@@ -49,9 +50,10 @@ def cleanup_wiki_link(match):
         title = title_match.group(1)
     else:
         title = cleaned_text
-    # Encode the URL to handle special characters
-    encoded_url = quote(cleaned_text)
-    url = '[' + title + '](' + encoded_url + '.html)'
+    url = '[' + title + '](' + cleaned_text + '.html)'
+    if platform.system() == 'Windows':
+        # Encode the URL to handle special characters on Windows systems
+        url = quote(url)
     return url
 
 
