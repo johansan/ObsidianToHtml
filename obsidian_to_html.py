@@ -53,19 +53,32 @@ def cleanup_wiki_link(match):
 
 
 def modify_content_with_regex(content):
-    # Clean up Obsidian media links:
-    pattern = r'!\[\[(.*?)\]\]'
-    modified_content = re.sub(pattern, cleanup_image_link, content)
 
-    # Clean up document WIKI links:
-    # [[../Folder/Document]] -> [../Folder/Document](../Folder/Document.html)
-    pattern = r'\[\[(.*?)\]\]'
-    modified_content = re.sub(pattern, cleanup_wiki_link, modified_content)
+    # Don't touch content within code blocks
+    pattern = r'(```.*?```)'  # Match everything between ``` and ```
+    parts = re.split(pattern, content, flags=re.DOTALL)
 
-    # Change Markdown style highlights into HTML span elements
-    pattern = r'==(.*?)=='
-    replacement = r'<span class="highlight">\1</span>'
-    modified_content = re.sub(pattern, replacement, modified_content)
+    for i in range(len(parts)):
+        # Process only the parts outside the ``` blocks
+        if not parts[i].startswith('```'):
+            # Clean up Obsidian media links:
+            pattern = r'!\[\[(.*?)\]\]'
+            parts_content = re.sub(pattern, cleanup_image_link, parts[i])
+
+            # Clean up document WIKI links:
+            # [[../Folder/Document]] -> [../Folder/Document](../Folder/Document.html)
+            pattern = r'\[\[(.*?)\]\]'
+            parts_content = re.sub(pattern, cleanup_wiki_link, parts_content)
+
+            # Change Markdown style highlights into HTML span elements
+            pattern = r'==(.*?)=='
+            replacement = r'<span class="highlight">\1</span>'
+            parts_content = re.sub(pattern, replacement, parts_content)
+
+            parts[i] = parts_content
+
+    # Reassemble the content
+    modified_content = ''.join(parts)
 
     return modified_content
 
