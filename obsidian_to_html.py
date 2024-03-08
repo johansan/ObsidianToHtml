@@ -134,7 +134,7 @@ def modify_and_convert_file(file_path, source_base, output_base, template_file):
 
         # Change the creation date of the output file to match the source file
         if platform.system() == 'Darwin':  # macOS
-            command = ['SetFile', '-d', formatted_time, file_path]
+            command = ['SetFile', '-d', formatted_time, output_html_path]
             try:
                 subprocess.run(command, check=True)
             except subprocess.CalledProcessError as e:
@@ -145,9 +145,9 @@ def modify_and_convert_file(file_path, source_base, output_base, template_file):
                 # Convert formatted_time back to a timestamp
                 creation_timestamp = datetime.strptime(formatted_time, '%m/%d/%Y %H:%M:%S').timestamp()
                 # Set creation, modified, and access times to the same value
-                win32_setfiletime.setctime(file_path, creation_timestamp)
-                win32_setfiletime.setmtime(file_path, creation_timestamp)
-                win32_setfiletime.setatime(file_path, creation_timestamp)
+                win32_setfiletime.setctime(output_html_path, creation_timestamp)
+                win32_setfiletime.setmtime(output_html_path, creation_timestamp)
+                win32_setfiletime.setatime(output_html_path, creation_timestamp)
             except ImportError:
                 print("You need to install pywin32. Run 'pip install pywin32' and then 'pip install win32-setfiletime'")
             except Exception as e:
