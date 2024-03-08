@@ -1,3 +1,5 @@
+# v1.0.0
+
 from tqdm import tqdm
 import json
 import os
@@ -8,7 +10,6 @@ import re
 import sys
 from pathlib import Path
 from datetime import datetime
-from urllib.parse import quote
 
 from util import folder_utils as fu
 
@@ -29,11 +30,7 @@ def cleanup_image_link(match):
     # Remove "|width" at the end of the string
     cleaned_text = re.sub(r'\|\d+$', '', inner_text)
     # Format the URL in standard markdown format
-    url = '![](' + cleaned_text + ')'
-    if platform.system() == 'Windows':
-        # Encode the URL to handle special characters on Windows systems
-        url = quote(url)
-    return url
+    return '![](' + cleaned_text + ')'
 
 
 # Clean up Obsidian WIKI links:
@@ -50,11 +47,7 @@ def cleanup_wiki_link(match):
         title = title_match.group(1)
     else:
         title = cleaned_text
-    url = '[' + title + '](' + cleaned_text + '.html)'
-    if platform.system() == 'Windows':
-        # Encode the URL to handle special characters on Windows systems
-        url = quote(url)
-    return url
+    return '[' + title + '](' + cleaned_text + '.html)'
 
 
 def modify_content_with_regex(content):
