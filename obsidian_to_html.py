@@ -1,6 +1,7 @@
 # v1.0.0
 
 from tqdm import tqdm
+import io
 import json
 import os
 import platform
@@ -83,42 +84,48 @@ def modify_content_with_regex(content):
 
 def modify_and_convert_file(file_path, source_base, output_base, template_file):
     with open(file_path, 'r', encoding='utf-8') as file:
+        # Get content
         content = file.read()
-
-        # Get filename
-        filename = Path(file_path).stem
-
-        # Get folderpath
-        foldername = os.path.dirname(file_path)
 
         # Modify the file content using regular expressions
         modified_content = modify_content_with_regex(content)
 
-        # Create a temporary file to save modified content
-        with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.md', encoding='utf-8') as temp_file:
-            temp_file.write(modified_content)
-            temp_file_path = temp_file.name
+        # Create an in-memory buffer for the modified content
+        with io.StringIO(modified_content) as temp_buffer:
 
-        # Construct output path preserving the directory structure
-        relative_path = os.path.relpath(file_path, source_base)
-        output_html_path = os.path.join(output_base, Path(relative_path).with_suffix('.html'))
-        output_directory = os.path.dirname(output_html_path)
-        os.makedirs(output_directory, exist_ok=True)
+            # Get filename
+            filename = Path(file_path).stem
 
-        command = [
-            'pandoc', '--standalone', '--embed-resources', '-f', 'markdown+hard_line_breaks',
-            '-t', 'html', '--resource-path', foldername,
-            '--template', template_file,
-            '--metadata', 'title=' + filename,
-            '--fail-if-warnings',
-            temp_file_path, '-o', output_html_path
-        ]
+            # Get folderpath
+            foldername = os.path.dirname(file_path)
 
-        try:
-            subprocess.run(command, check=True)
-        except subprocess.CalledProcessError as e:
-            print(f"Pandoc failed, error: {e}")
-            print('File: ' + filename)
+            # Construct output path preserving the directory structure
+            relative_path = os.path.relpath(file_path, source_base)
+            output_html_path = os.path.join(output_base, Path(relative_path).with_suffix('.html'))
+            output_directory = os.path.dirname(output_html_path)
+            os.makedirs(output_directory, exist_ok=True)
+
+            command = [
+                'pandoc', '--standalone', '--embed-resources', '-f', 'markdown+hard_line_breaks',
+                '-t', 'html', '--resource-path', f"{source_base}:{foldername}",
+                '--template', template_file,
+                '--metadata', 'title=' + filename,
+                '--fail-if-warnings',
+                '-', '-o', output_html_path
+            ]
+
+            try:
+                process = subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+                _, stderr = process.communicate(input=temp_buffer.getvalue())                
+                if process.returncode != 0:
+                    raise subprocess.CalledProcessError(process.returncode, command, stderr=stderr)
+            except subprocess.CalledProcessError as e:
+                # Pandoc failed. Probably due to invalid relative path.
+                print(f"Pandoc failed, writing filename to error.txt. Error: {e}")
+
+                # Write the name of the failed file to output.txt
+                with open("error.txt", "a", encoding='utf-8') as output_file:
+                    output_file.write(f"{file_path}\n")
 
         # Get the creation date of source file
         stat = os.stat(file.name)
@@ -147,9 +154,6 @@ def modify_and_convert_file(file_path, source_base, output_base, template_file):
                 print(f"Error changing creation date: {e}")
         else:
             print("Unsupported OS")
-
-        # Remove the temporary file
-        os.remove(temp_file_path)
 
 
 def process_directory(source_base, output_base, template_file):
@@ -185,6 +189,15 @@ if __name__ == "__main__":
     current_file = os.path.realpath(__file__)
     current_folder = os.path.dirname(current_file)
     template_file = current_folder + '/' + template
+
+    # Check if error file exists, then remove it
+    err_file = "error.txt"
+    if os.path.exists(err_file):
+        try:
+            os.remove(err_file)
+        except Exception as e:
+            print(f"Error removing {err_file}: {e}")
+            exit(1)
 
     # Check if the config file exists
     if os.path.exists(config_file_name):
