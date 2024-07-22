@@ -5,36 +5,73 @@
     <meta name="created" content='$created$'>
     <title>$title$</title>
     <style>
-      /* General body styling */
       body {
-        font-family: 'Arial', sans-serif;
-        font-size: 16px;
+        font-family: 'Source Sans Pro', 'Arial', sans-serif;
+        font-size: 15px;
         background-color: white;
       }
 
-      /* Specific styling for code elements */
       code {
-        font-family: 'Courier New', monospace;
-        font-size: 15px; /* Sets the text size for code blocks */
+        font-family: 'Source Code Pro', 'Courier New', monospace;
+        font-size: 0.8em; /* Sets the text size for code blocks */
         background-color: #f0f0f0; /* light gray background */
         display: block; /* to make code blocks span multiple lines */
         padding: 0.5em; /* Add some padding around the code */
         white-space: pre-wrap; /* Ensures that code respects original whitespace and line breaks */
       }
 
-      /* H1 styling */
-      h1 {
-        font-size: 1.125em;
-        color: #393E99;
+      blockquote {
+          font-size: 1.1em;
+          width: 80%;
+          margin: 50px auto;
+          font-family: 'Source Serif Pro', 'Georgia', serif;
+          font-style: italic;
+          color: #555555;
+          padding: 1.2em 30px 1.2em 75px;
+          border-left: 8px solid #78C0A8;
+          line-height: 1.6;
+          position: relative;
+          background: #EDEDED;
       }
 
-      /* H2 styling */
+      blockquote::before {
+          content: '\201C';
+          color: #78C0A8;
+          font-size: 4em;
+          position: absolute;
+          left: 10px;
+          top: -10px;
+      }
+
+      blockquote::after {
+          content: '\201D';
+          color: #78C0A8;
+          font-size: 4em;
+          position: absolute;
+          right: 10px;
+          bottom: -50px;
+      }
+
+      blockquote span {
+          display: block;
+          color: #333333;
+          font-style: normal;
+          font-weight: bold;
+          margin-top: 1em;
+      }
+
+      h1 {
+        font-family: 'Source Serif Pro', 'Arial', sans-serif;
+        font-size: 1.5em;
+        font-weight: 800;
+        margin-top: 2rem;
+      }
+
       h2 {
         font-size: 1em;
         color: #000000;
       }
 
-      /* H3 styling */
       h3 {
         font-size: 1em;
         color: #000000;
