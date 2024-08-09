@@ -25,13 +25,21 @@ template = 'template.html'
 
 
 # Clean up Obsidian media links:
-# ![[../../_resources/my image.png|450]] -> ![](../../_resources/my%20image.png)
+# ![[../../_resources/my image.png|450]] -> ![](_resources/my%20image.png){ width=450px }
 def cleanup_image_link(match):
     inner_text = match.group(1)
+    # Extract the width if present
+    width_match = re.search(r'\|(\d+)$', inner_text)
+    width = width_match.group(1) if width_match else None
+    
     # Remove "|width" at the end of the string
     cleaned_text = re.sub(r'\|\d+$', '', inner_text)
-    # Format the URL in standard markdown format
-    return '![](' + cleaned_text + ')'
+    
+    # Format the URL in standard markdown format with width attribute if present
+    if width:
+        return f'![]({cleaned_text}){{ width={width}px }}'
+    else:
+        return f'![]({cleaned_text})'
 
 
 # Clean up Obsidian WIKI links:
