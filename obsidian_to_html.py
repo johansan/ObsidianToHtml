@@ -11,6 +11,7 @@ import re
 import sys
 from pathlib import Path
 from datetime import datetime
+import urllib.parse
 
 from util import folder_utils as fu
 
@@ -59,109 +60,161 @@ def cleanup_wiki_link(match):
     return '[' + title + '](' + cleaned_text + '.html)'
 
 
-def modify_content_with_regex(content):
+def modify_content_with_regex(content, youtube_placeholders=None):
     # Don't touch content within code blocks
-    pattern = r'(```.*?```)'  # Match everything between ``` and ```
-    parts = re.split(pattern, content, flags=re.DOTALL)
+    parts = re.split(r'(```.*?```)', content, flags=re.DOTALL)
+    yt_index = 0  # Counter for YouTube placeholders
+    if youtube_placeholders is None:
+        youtube_placeholders = {}
 
     for i in range(len(parts)):
         # Process only the parts outside the ``` blocks
         if not parts[i].startswith('```'):
+            
+            # Detect YouTube image links and process them before other image transforms.
+            def replace_youtube(match):
+                nonlocal yt_index
+                alt_text = match.group(1)
+                url = match.group(2)
+                placeholder = f"YOUTUBEPLACEHOLDER_{yt_index}"
+                yt_index += 1
+                youtube_placeholders[placeholder] = {'url': url, 'alt': alt_text}
+                # Remove the "!" so pandoc treats it as a normal link with the placeholder text.
+                return f'[{placeholder}]({url})'
+            
+            pattern_youtube = r'!\[([^\]]*)\]\((https?://(?:www\.youtube\.com/watch\?v=[^)]+|https?://youtu\.be/[^)]+))\)'
+            parts[i] = re.sub(pattern_youtube, replace_youtube, parts[i])
+            
             # Clean up Obsidian media links:
-            pattern = r'!\[\[(.*?)\]\]'
-            parts_content = re.sub(pattern, cleanup_image_link, parts[i])
-
+            pattern_media = r'!\[\[(.*?)\]\]'
+            parts[i] = re.sub(pattern_media, cleanup_image_link, parts[i])
+            
             # Clean up document WIKI links:
-            pattern = r'\[\[(.*?)\]\]'
-            parts_content = re.sub(pattern, cleanup_wiki_link, parts_content)
-
-            # Change Markdown style highlights into HTML span elements
-            pattern = r'==(.*?)=='
-            replacement = r'<span class="highlight">\1</span>'
-            parts_content = re.sub(pattern, replacement, parts_content)
-
+            pattern_wiki = r'\[\[(.*?)\]\]'
+            parts[i] = re.sub(pattern_wiki, cleanup_wiki_link, parts[i])
+            
+            # Change Markdown style highlights into HTML span elements:
+            pattern_highlight = r'==(.*?)=='
+            parts[i] = re.sub(pattern_highlight, r'<span class="highlight">\1</span>', parts[i])
+            
             # TODO: Add more regex patterns to modify the content as you like
 
-            parts[i] = parts_content
-
-    # Reassemble the content
     modified_content = ''.join(parts)
-
     return modified_content
 
 
+def get_youtube_embed_code(url):
+    """
+    Given a YouTube URL, extract the video ID and return the corresponding embed iframe HTML code.
+    """
+    parsed_url = urllib.parse.urlparse(url)
+    video_id = None
+
+    if 'youtube.com' in parsed_url.netloc:
+        query_params = urllib.parse.parse_qs(parsed_url.query)
+        video_id = query_params.get('v', [None])[0]
+    elif 'youtu.be' in parsed_url.netloc:
+        video_id = parsed_url.path.lstrip('/')
+
+    if video_id:
+        return f'<iframe width="560" height="315" src="https://www.youtube.com/embed/{video_id}" frameborder="0" allowfullscreen></iframe>'
+    
+    return None
+
+
 def modify_and_convert_file(file_path, source_base, output_base, template_file):
+    youtube_placeholders = {}  # Dictionary to store YouTube link details for this file
     with open(file_path, 'r', encoding='utf-8') as file:
         # Get content
         content = file.read()
 
-        # Modify the file content using regular expressions
-        modified_content = modify_content_with_regex(content)
+    # Modify file content using regex while capturing YouTube placeholders
+    modified_content = modify_content_with_regex(content, youtube_placeholders)
 
-        # Create an in-memory buffer for the modified content
-        with io.StringIO(modified_content) as temp_buffer:
+    # Create an in-memory buffer for the modified content
+    with io.StringIO(modified_content) as temp_buffer:
 
-            # Get filename
-            filename = Path(file_path).stem
+        # Get filename
+        filename = Path(file_path).stem
 
-            # Get folderpath
-            foldername = os.path.dirname(file_path)
+        # Get folderpath
+        foldername = os.path.dirname(file_path)
 
-            # Construct output path preserving the directory structure
-            relative_path = os.path.relpath(file_path, source_base)
-            output_html_path = os.path.join(output_base, Path(relative_path).with_suffix('.html'))
-            output_directory = os.path.dirname(output_html_path)
-            os.makedirs(output_directory, exist_ok=True)
+        # Construct output path preserving the directory structure
+        relative_path = os.path.relpath(file_path, source_base)
+        output_html_path = os.path.join(output_base, Path(relative_path).with_suffix('.html'))
+        output_directory = os.path.dirname(output_html_path)
+        os.makedirs(output_directory, exist_ok=True)
 
-            command = [
-                'pandoc', '--standalone', '--embed-resources', '-f', 'markdown+hard_line_breaks',
-                '-t', 'html', '--resource-path', f"{source_base}:{foldername}",
-                '--template', template_file,
-                '--metadata', 'title=' + filename,
-                '--fail-if-warnings',
-                '-', '-o', output_html_path
-            ]
+        command = [
+            'pandoc', '--standalone', '--embed-resources', '-f', 'markdown+hard_line_breaks',
+            '-t', 'html', '--resource-path', f"{source_base}:{foldername}",
+            '--template', template_file,
+            '--metadata', 'title=' + filename,
+            '--fail-if-warnings',
+            '-', '-o', output_html_path
+        ]
 
-            try:
-                process = subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-                _, stderr = process.communicate(input=temp_buffer.getvalue())                
-                if process.returncode != 0:
-                    raise subprocess.CalledProcessError(process.returncode, command, stderr=stderr)
-            except subprocess.CalledProcessError as e:
-                # Pandoc failed. Probably due to invalid relative path.
-                print(f"Pandoc failed, writing filename to error.txt. Error: {e}")
+        try:
+            process = subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+            _, stderr = process.communicate(input=temp_buffer.getvalue())                
+            if process.returncode != 0:
+                raise subprocess.CalledProcessError(process.returncode, command, stderr=stderr)
+        except subprocess.CalledProcessError as e:
+            # Pandoc failed. Probably due to invalid relative path.
+            print(f"Pandoc failed, writing filename to error.txt. Error: {e}")
 
-                # Write the name of the failed file to output.txt
-                with open("error.txt", "a", encoding='utf-8') as output_file:
-                    output_file.write(f"{file_path}\n")
+            # Write the name of the failed file to error.txt
+            with open("error.txt", "a", encoding='utf-8') as output_file:
+                output_file.write(f"{file_path}\n")
 
-        # Get the creation date of source file
-        stat = os.stat(file.name)
-        creation_time = stat.st_birthtime
-        formatted_time = datetime.fromtimestamp(creation_time).strftime('%m/%d/%Y %H:%M:%S')
+    # Post-process the generated HTML file to replace YouTube placeholders with embed code
+    if youtube_placeholders:
+        try:
+            with open(output_html_path, 'r', encoding='utf-8') as html_file:
+                html_content = html_file.read()
+            for placeholder, info in youtube_placeholders.items():
+                url = info['url']
+                embed_code = get_youtube_embed_code(url)
+                if embed_code:
+                    # Pandoc converts the markdown link to an anchor tag like:
+                    # <a href="url">PLACEHOLDER</a>
+                    # Replace this with the YouTube embed code.
+                    pattern = r'<a\s+href="' + re.escape(url) + r'">' + re.escape(placeholder) + r'</a>'
+                    html_content = re.sub(pattern, embed_code, html_content)
+            with open(output_html_path, 'w', encoding='utf-8') as html_file:
+                html_file.write(html_content)
+        except Exception as e:
+            print(f"Error during post-processing YouTube links in {output_html_path}: {e}")
 
-        # Change the creation date of the output file to match the source file
-        if platform.system() == 'Darwin':  # macOS
-            command = ['SetFile', '-d', formatted_time, output_html_path]
-            try:
-                subprocess.run(command, check=True)
-            except subprocess.CalledProcessError as e:
-                print(f"Error changing creation date: {e}")
-        elif platform.system() == 'Windows':
-            try:
-                import win32_setfiletime
-                # Convert formatted_time back to a timestamp
-                creation_timestamp = datetime.strptime(formatted_time, '%m/%d/%Y %H:%M:%S').timestamp()
-                # Set creation, modified, and access times to the same value
-                win32_setfiletime.setctime(output_html_path, creation_timestamp)
-                win32_setfiletime.setmtime(output_html_path, creation_timestamp)
-                win32_setfiletime.setatime(output_html_path, creation_timestamp)
-            except ImportError:
-                print("You need to install pywin32. Run 'pip install pywin32' and then 'pip install win32-setfiletime'")
-            except Exception as e:
-                print(f"Error changing creation date: {e}")
-        else:
-            print("Unsupported OS")
+    # Get the creation date of the source file
+    stat_info = os.stat(file_path)
+    # For systems where st_birthtime is not available, fallback to st_mtime
+    creation_time = getattr(stat_info, 'st_birthtime', stat_info.st_mtime)
+    formatted_time = datetime.fromtimestamp(creation_time).strftime('%m/%d/%Y %H:%M:%S')
+
+    # Change the creation date of the output file to match the source file
+    if platform.system() == 'Darwin':  # macOS
+        command = ['SetFile', '-d', formatted_time, output_html_path]
+        try:
+            subprocess.run(command, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error changing creation date: {e}")
+    elif platform.system() == 'Windows':
+        try:
+            import win32_setfiletime
+            # Convert formatted_time back to a timestamp
+            creation_timestamp = datetime.strptime(formatted_time, '%m/%d/%Y %H:%M:%S').timestamp()
+            # Set creation, modified, and access times to the same value
+            win32_setfiletime.setctime(output_html_path, creation_timestamp)
+            win32_setfiletime.setmtime(output_html_path, creation_timestamp)
+            win32_setfiletime.setatime(output_html_path, creation_timestamp)
+        except ImportError:
+            print("You need to install pywin32. Run 'pip install pywin32' and then 'pip install win32-setfiletime'")
+        except Exception as e:
+            print(f"Error changing creation date: {e}")
+    else:
+        print("Unsupported OS")
 
 
 def process_directory(source_base, output_base, template_file):
