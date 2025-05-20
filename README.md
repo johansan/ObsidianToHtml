@@ -17,7 +17,29 @@ This Python script **for Windows and MacOS** converts your entire Obsidian vault
 1. You can exclude folders you do not want to process using the variable "excluded_dirs". This is already set to {'_excalidraw', '_resources', '_templates', '.obsidian', '.trash'}.
 2. You can modify the file **template.html** according to your likings to change the way the HTML file looks.
 
-To run the script you need Python and Pandoc installed. For Python environment [I recommend PyCharm CE](https://www.jetbrains.com/pycharm/download/other.html), Pandoc [can be downloaded here](https://pandoc.org/installing.html).
+## Installation
+
+### Prerequisites
+1. **Python 3.x** - For Python environment [I recommend PyCharm CE](https://www.jetbrains.com/pycharm/download/other.html)
+2. **Pandoc** - Required for the markdown to HTML conversion:
+   - **macOS**: 
+     ```
+     # Install with Homebrew (recommended)
+     brew install pandoc
+     
+     # If you don't have Homebrew, install it first with:
+     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+     ```
+   - **Windows**: [Download the installer](https://pandoc.org/installing.html) or use Chocolatey (`choco install pandoc`)
+   - **Linux**: Use your package manager (e.g., `apt-get install pandoc`)
+
+### Python Packages
+Install required packages:
+```bash
+pip install -r requirements.txt
+```
+
+The script will automatically check if Pandoc is installed and provide installation instructions if needed.
 
 ## Frontmatter Properties
 

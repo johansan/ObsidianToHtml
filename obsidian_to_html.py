@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import re
 import sys
+import shutil
 from pathlib import Path
 from datetime import datetime
 import urllib.parse
@@ -20,6 +21,45 @@ config_file_name = 'config.json'
 
 # The following folders will be excluded from processing
 excluded_dirs = {'_excalidraw', '_resources', '_templates', '.obsidian', '.trash'}
+
+def check_pandoc_installed():
+    """
+    Check if pandoc is installed and accessible from the command line.
+    If not, provide installation instructions based on the operating system.
+    Returns True if pandoc is installed, False otherwise.
+    """
+    if shutil.which('pandoc') is not None:
+        return True
+    
+    print("Error: Pandoc is not installed or not in your PATH.")
+    print("\nPandoc is required for this script to run. Installation instructions:")
+    
+    if platform.system() == 'Darwin':  # macOS
+        # Check if Homebrew is installed
+        if shutil.which('brew') is not None:
+            print("\nHomebrew is installed. Install Pandoc using:")
+            print("    brew install pandoc")
+        else:
+            print("\nHomebrew is not installed. You can:")
+            print("1. Install Homebrew first with:")
+            print("    /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"")
+            print("   Then install Pandoc with: brew install pandoc")
+            print("2. Or download Pandoc directly from: https://pandoc.org/installing.html")
+    elif platform.system() == 'Windows':
+        print("\nWindows installation options:")
+        print("1. Download the installer from: https://pandoc.org/installing.html")
+        print("2. Or use Chocolatey: choco install pandoc")
+        print("3. Or use Winget: winget install pandoc")
+    else:  # Linux and others
+        print("\nLinux installation options:")
+        print("1. Use your package manager, e.g.:")
+        print("   - Debian/Ubuntu: sudo apt-get install pandoc")
+        print("   - Fedora: sudo dnf install pandoc")
+        print("   - Arch Linux: sudo pacman -S pandoc")
+        print("2. Or download from: https://pandoc.org/installing.html")
+    
+    print("\nAfter installation, restart your terminal and try running this script again.")
+    return False
 
 # Your HTML template file (located in same folder as this script)
 template = 'template.html'
@@ -160,6 +200,11 @@ def modify_and_convert_file(file_path, source_base, output_base, template_file):
             _, stderr = process.communicate(input=temp_buffer.getvalue())                
             if process.returncode != 0:
                 raise subprocess.CalledProcessError(process.returncode, command, stderr=stderr)
+        except FileNotFoundError:
+            # This might happen if pandoc is not in the PATH or not installed
+            print(f"Error: Could not execute pandoc command. Please ensure pandoc is installed and in your PATH.")
+            print("Run this script again to see installation instructions.")
+            sys.exit(1)
         except subprocess.CalledProcessError as e:
             # Pandoc failed. Probably due to invalid relative path.
             print(f"Pandoc failed, writing filename to error.txt. Error: {e}")
@@ -247,6 +292,10 @@ def load_paths():
 
 
 if __name__ == "__main__":
+    # Check if pandoc is installed
+    if not check_pandoc_installed():
+        sys.exit(1)
+        
     current_file = os.path.realpath(__file__)
     current_folder = os.path.dirname(current_file)
     template_file = current_folder + '/' + template
