@@ -19,8 +19,24 @@ from util import folder_utils as fu
 # Configuration file for obsidian vault and destination folder
 config_file_name = 'config.json'
 
-# The following folders will be excluded from processing
-excluded_dirs = {'_excalidraw', '_resources', '_templates', '.obsidian', '.trash'}
+# Default configuration values
+DEFAULT_CONFIG = {
+    'excluded_folders': ['_excalidraw', '_resources', '_templates', '.obsidian', '.trash'],
+    'exclude_frontmatter_properties': [],
+    'template_file': 'templates/user.html',
+    '_comments': {
+        'excluded_folders': 'List of folder names that will be excluded from processing',
+        'exclude_frontmatter_properties': 'Files with these frontmatter properties set to true will be excluded (e.g. ["foldernote", "private"])',
+        'template_file': 'HTML template file to use for conversion (user-customizable)'
+    }
+}
+
+# Base template file path (not configurable by user, used only during setup)
+BASE_TEMPLATE_FILE = 'templates/template.html'
+
+# Global variables for configuration settings
+excluded_dirs = set()
+exclude_frontmatter_properties = set()
 
 def check_pandoc_installed():
     """
@@ -61,8 +77,45 @@ def check_pandoc_installed():
     print("\nAfter installation, restart your terminal and try running this script again.")
     return False
 
-# Your HTML template file (located in same folder as this script)
-template = 'template.html'
+# Global variable for template file path
+template_file = ''
+
+def setup_template_files():
+    """
+    Set up the template files by ensuring user.html exists.
+    If it doesn't exist, copy it from the base template.
+    
+    Returns:
+        str: Path to the template file to use for conversion
+    """
+    global template_file
+    
+    # Get the path to the script's directory
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    
+    # Construct full paths
+    base_template_path = os.path.join(current_dir, BASE_TEMPLATE_FILE)
+    user_template_path = os.path.join(current_dir, DEFAULT_CONFIG['template_file'])
+    
+    # Check if user template exists
+    if not os.path.exists(user_template_path):
+        # Create templates directory if it doesn't exist
+        templates_dir = os.path.dirname(user_template_path)
+        os.makedirs(templates_dir, exist_ok=True)
+        
+        # Check if base template exists
+        if not os.path.exists(base_template_path):
+            print(f"Error: Base template file not found at {base_template_path}")
+            sys.exit(1)
+            
+        # Copy base template to user template
+        import shutil
+        shutil.copy2(base_template_path, user_template_path)
+        print(f"Created user template file at {user_template_path}")
+        print("You can customize this file to change the HTML output appearance.")
+    
+    template_file = user_template_path
+    return template_file
 
 
 # Clean up Obsidian media links:
@@ -162,12 +215,45 @@ def get_youtube_embed_code(url):
     return None
 
 
-def modify_and_convert_file(file_path, source_base, output_base, template_file):
+def should_exclude_file(content):
+    """
+    Check if a file should be excluded based on its frontmatter properties.
+    
+    Args:
+        content: The content of the file to check
+        
+    Returns:
+        bool: True if the file should be excluded, False otherwise
+    """
+    if not exclude_frontmatter_properties:
+        return False
+        
+    # Check if file has frontmatter (content between --- and ---)
+    frontmatter_match = re.match(r'^---\s*\n(.*?)\n---\s*\n', content, re.DOTALL)
+    if not frontmatter_match:
+        return False
+        
+    frontmatter_content = frontmatter_match.group(1)
+    
+    # Check each property in the exclude list
+    for prop in exclude_frontmatter_properties:
+        # Look for the property set to true (allowing for various YAML boolean formats)
+        if re.search(rf'{prop}\s*:\s*(true|yes|y|on|1)\s*($|\n)', frontmatter_content, re.IGNORECASE):
+            return True
+            
+    return False
+
+
+def modify_and_convert_file(file_path, source_base, output_base):
     youtube_placeholders = {}  # Dictionary to store YouTube link details for this file
     with open(file_path, 'r', encoding='utf-8') as file:
         # Get content
         content = file.read()
-
+    
+    # Check if file should be excluded based on frontmatter
+    if should_exclude_file(content):
+        return
+        
     # Modify file content using regex while capturing YouTube placeholders
     modified_content = modify_content_with_regex(content, youtube_placeholders)
 
@@ -189,7 +275,7 @@ def modify_and_convert_file(file_path, source_base, output_base, template_file):
         command = [
             'pandoc', '--standalone', '--embed-resources', '-f', 'markdown+hard_line_breaks',
             '-t', 'html', '--resource-path', f"{source_base}:{foldername}",
-            '--template', template_file,
+            '--template', template_file,  # Global variable set in setup_template_files()
             '--metadata', 'title=' + filename,
             '--fail-if-warnings',
             '-', '-o', output_html_path
@@ -202,16 +288,29 @@ def modify_and_convert_file(file_path, source_base, output_base, template_file):
                 raise subprocess.CalledProcessError(process.returncode, command, stderr=stderr)
         except FileNotFoundError:
             # This might happen if pandoc is not in the PATH or not installed
-            print(f"Error: Could not execute pandoc command. Please ensure pandoc is installed and in your PATH.")
+            error_msg = f"Error: Could not execute pandoc command for file: {file_path}\nPlease ensure pandoc is installed and in your PATH."
+            print(error_msg)
             print("Run this script again to see installation instructions.")
+            
+            # Write error to errors.txt
+            with open("errors.txt", "a", encoding='utf-8') as output_file:
+                output_file.write(f"===== {file_path} =====\n")
+                output_file.write(f"Error: Pandoc not found or not in PATH\n")
+                output_file.write(f"Command attempted: {' '.join(command)}\n")
+                output_file.write("=" * 80 + "\n\n")
+            
             sys.exit(1)
         except subprocess.CalledProcessError as e:
-            # Pandoc failed. Probably due to invalid relative path.
-            print(f"Pandoc failed, writing filename to error.txt. Error: {e}")
+            # Pandoc failed - capture detailed error information
+            error_msg = f"Pandoc conversion failed for: {file_path}\nError: {e.stderr}\n"
+            print(error_msg)
 
-            # Write the name of the failed file to error.txt
-            with open("error.txt", "a", encoding='utf-8') as output_file:
-                output_file.write(f"{file_path}\n")
+            # Write detailed error information to errors.txt
+            with open("errors.txt", "a", encoding='utf-8') as output_file:
+                output_file.write(f"===== {file_path} =====\n")
+                output_file.write(f"Error: {e.stderr}\n")
+                output_file.write(f"Command: {' '.join(command)}\n")
+                output_file.write("=" * 80 + "\n\n")
 
     # Post-process the generated HTML file to replace YouTube placeholders with embed code
     if youtube_placeholders:
@@ -262,46 +361,110 @@ def modify_and_convert_file(file_path, source_base, output_base, template_file):
         print("Unsupported OS")
 
 
-def process_directory(source_base, output_base, template_file):
+def process_directory(source_base, output_base):
     # First, create a list of all files that need to be processed
     files_to_process = []
+    
+    # Ensure excluded_dirs is populated
+    if not excluded_dirs and DEFAULT_CONFIG['excluded_folders']:
+        excluded_dirs.update(DEFAULT_CONFIG['excluded_folders'])
+    
+    print(f"Scanning directories (excluding: {', '.join(excluded_dirs)})")
+    
     for root, dirs, files in os.walk(source_base, topdown=True):
-        dirs[:] = [d for d in dirs if d not in excluded_dirs]  # Assuming 'excluded_dirs' is defined somewhere
+        # Skip excluded directories
+        dirs[:] = [d for d in dirs if d not in excluded_dirs]
+        
+        # Collect markdown files
         for file in files:
             if file.endswith('.md'):
                 file_path = os.path.join(root, file)
-                files_to_process.append((file_path, source_base, output_base, template_file))
+                files_to_process.append((file_path, source_base, output_base))
 
     # Now process the files with a progress bar
-    for file_path, source_base, output_base, template_file in tqdm(files_to_process, desc="Processing files"):
-        modify_and_convert_file(file_path, source_base, output_base, template_file)
+    print(f"Found {len(files_to_process)} markdown files to process")
+    
+    # Check if we need to filter by frontmatter
+    if exclude_frontmatter_properties:
+        print(f"Files with these frontmatter properties set to true will be excluded: {', '.join(exclude_frontmatter_properties)}")
+    
+    for file_path, source_base, output_base in tqdm(files_to_process, desc="Processing files"):
+        modify_and_convert_file(file_path, source_base, output_base)
 
 
-def save_paths(obsidian_folder, destination_folder):
-    """Save the folder paths to the config file in JSON format."""
-    config_data = {'obsidian_folder': obsidian_folder, 'destination_folder': destination_folder}
+def save_config(obsidian_folder, destination_folder, custom_settings=None):
+    """
+    Save the configuration to the config file in JSON format with proper formatting.
+    
+    Args:
+        obsidian_folder: Path to the Obsidian vault
+        destination_folder: Path for the HTML output
+        custom_settings: Dictionary with custom settings that override defaults
+    """
+    # Start with default config
+    config_data = DEFAULT_CONFIG.copy()
+    
+    # Add required paths
+    config_data['obsidian_folder'] = obsidian_folder
+    config_data['destination_folder'] = destination_folder
+    
+    # Override with any custom settings
+    if custom_settings:
+        for key, value in custom_settings.items():
+            if key != 'obsidian_folder' and key != 'destination_folder':
+                config_data[key] = value
+    
     with open(config_file_name, 'w') as file:
-        json.dump(config_data, file)
+        json.dump(config_data, file, indent=4, sort_keys=False)
 
 
-def load_paths():
-    """Load the folder paths from the config file."""
-    with open(config_file_name, 'r') as file:
-        config_data = json.load(file)
-    return config_data['obsidian_folder'], config_data['destination_folder']
+def load_config():
+    """
+    Load the configuration from the config file.
+    
+    Returns:
+        tuple: (obsidian_folder, destination_folder)
+    """
+    global excluded_dirs, exclude_frontmatter_properties
+    
+    try:
+        with open(config_file_name, 'r') as file:
+            config_data = json.load(file)
+        
+        # Apply default values for any missing keys
+        for key, default_value in DEFAULT_CONFIG.items():
+            if key not in config_data and key != '_comments':
+                config_data[key] = default_value
+        
+        # Extract required paths
+        obsidian_folder = config_data['obsidian_folder']
+        destination_folder = config_data['destination_folder']
+        
+        # Load excluded folders
+        excluded_dirs = set(config_data.get('excluded_folders', DEFAULT_CONFIG['excluded_folders']))
+        
+        # Load frontmatter exclusion properties
+        exclude_frontmatter_properties = set(config_data.get('exclude_frontmatter_properties', 
+                                                         DEFAULT_CONFIG['exclude_frontmatter_properties']))
+        
+        return obsidian_folder, destination_folder
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"Error loading configuration file: {e}")
+        print("The configuration file appears to be invalid.")
+        print("You can delete the file and run the script again to create a new one.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     # Check if pandoc is installed
     if not check_pandoc_installed():
         sys.exit(1)
-        
-    current_file = os.path.realpath(__file__)
-    current_folder = os.path.dirname(current_file)
-    template_file = current_folder + '/' + template
+    
+    # Setup template files
+    setup_template_files()
 
     # Check if error file exists, then remove it
-    err_file = "error.txt"
+    err_file = "errors.txt"
     if os.path.exists(err_file):
         try:
             os.remove(err_file)
@@ -311,9 +474,24 @@ if __name__ == "__main__":
 
     # Check if the config file exists
     if os.path.exists(config_file_name):
-        obsidian_folder, destination_folder = load_paths()
-        print("Loaded paths from config file.\nObsidian vault: ", obsidian_folder, "\nDestination folder: ", destination_folder)
+        obsidian_folder, destination_folder = load_config()
+        print("Loaded configuration from config file.")
+        print(f"Obsidian vault: {obsidian_folder}")
+        print(f"Destination folder: {destination_folder}")
+        print(f"Excluded folders: {', '.join(excluded_dirs)}")
+        if exclude_frontmatter_properties:
+            print(f"Files with these frontmatter properties set to true will be excluded: {', '.join(exclude_frontmatter_properties)}")
+        else:
+            print("No frontmatter exclusion properties configured.")
     else:
+        # First-time setup
+        print("\n" + "=" * 80)
+        print("FIRST-TIME SETUP")
+        print("=" * 80)
+        print("No configuration file found. Setting up initial configuration...")
+        print("\nYou'll need to provide two paths to get started:")
+        print(" 1. The location of your Obsidian vault")
+        print(" 2. A destination folder for the generated HTML files\n")
         obsidian_folder = fu.remove_trailing_slash(input("Enter source path to your Obsidian vault: "))
 
         # Check for .obsidian folder in Obsidian_folder
@@ -330,9 +508,25 @@ if __name__ == "__main__":
                 print("Operation cancelled by the user.")
                 sys.exit(1)
 
-        save_paths(obsidian_folder, destination_folder)
-        print("Paths have been saved to '" + config_file_name + "'")
+        # Create config with default settings
+        save_config(obsidian_folder, destination_folder)
+        print("\n" + "-" * 80)
+        print("SETUP COMPLETE!")
+        print("-" * 80)
+        print(f"Configuration saved to '{config_file_name}' with the following settings:")
+        print(f"  • Obsidian vault: {obsidian_folder}")
+        print(f"  • Destination folder: {destination_folder}")
+        print(f"  • Excluded folders: {', '.join(DEFAULT_CONFIG['excluded_folders'])}")
+        print("\nYou can modify these settings in the config file if needed.")
+        print("For example, you can add 'foldernote' to the exclude_frontmatter_properties")
+        print("list to skip files with foldernote: true in their frontmatter.")
+        print("\n" + "=" * 80)
+        print("NEXT STEPS")
+        print("=" * 80)
+        print("Run the script again to start the conversion process.")
+        print("The program will read your configuration and begin converting your files.")
+        sys.exit(0)
 
     # Call the process_directory function with command line arguments
-    process_directory(obsidian_folder, destination_folder, template_file)
+    process_directory(obsidian_folder, destination_folder)
 
