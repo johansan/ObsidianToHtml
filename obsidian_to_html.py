@@ -384,10 +384,6 @@ def process_directory(source_base, output_base):
     # Now process the files with a progress bar
     print(f"Found {len(files_to_process)} markdown files to process")
     
-    # Check if we need to filter by frontmatter
-    if exclude_frontmatter_properties:
-        print(f"Files with these frontmatter properties set to true will be excluded: {', '.join(exclude_frontmatter_properties)}")
-    
     for file_path, source_base, output_base in tqdm(files_to_process, desc="Processing files"):
         modify_and_convert_file(file_path, source_base, output_base)
 

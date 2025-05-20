@@ -61,19 +61,20 @@ source .venv/bin/activate
 python obsidian_to_html.py
 ```
 
-On first run, you'll be prompted to provide:
+On first run, you'll be presented with a clear setup wizard that will prompt you to provide:
 1. Path to your Obsidian vault
 2. Destination folder for HTML output
 
-These paths are saved to `config.json` for subsequent runs.
+These paths are saved to `config.json` for subsequent runs, along with other configuration settings.
 
 ## File Structure
 
 - `obsidian_to_html.py` - Main script
-- `template.html` - HTML template used for conversion
+- `templates/template.html` - HTML template used for conversion
 - `util/folder_utils.py` - Utility functions for folder operations
 - `config.json` - Created on first run to store folder paths
 - `requirements.txt` - Python package dependencies
+- `errors.txt` - Generated if any file conversions fail, containing detailed error information
 
 ## Key Components
 
